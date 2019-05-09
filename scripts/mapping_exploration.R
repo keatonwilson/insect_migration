@@ -19,7 +19,8 @@ library(ggthemes)
 library(rgeos)
 library(maps)
 library(viridis)
-
+library(gganimate)
+library(transformr)
 #Map API
 #register google api for mapping stuff
 register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")
@@ -116,3 +117,28 @@ n_californica_by_month = ggplot(data = n_californica) +
   facet_wrap(~ month)
 
 ggsave(plot = n_californica_by_month, filename = "./output/n_californica_by_month.png", device = "png")
+
+#Animation
+anim = ggplot(data = n_californica) +  
+geom_polygon(data=simple_map_US, aes(x=long, y=lat, group=group), 
+             color=NA, size=0.25, fill = "#440154FF") +
+  geom_polygon(data=simple_map_US, aes(x=long, y=lat, group=group), 
+               color="grey50", size=0.25, fill = NA) +
+  geom_polygon(data=simple_map_can, aes(x=long, y=lat, group=group), 
+               color=NA, size=0.25, fill = "#440154FF") +
+  geom_polygon(data=simple_map_can, aes(x=long, y=lat, group=group), 
+               color="grey50", size=0.25, fill = NA) +
+  geom_point(data = n_californica, aes(x = longitude, y = latitude), color = "yellow", alpha = 0.3, size = 3, shape = 3) +
+  stat_density_2d(data = n_californica, aes(x = longitude, y = latitude, fill = stat(nlevel)), geom = "polygon", alpha = 0.5) +
+  scale_fill_distiller(palette = 'Spectral') +
+  theme(legend.position="bottom") +
+  theme(legend.key.width=unit(2, "cm"),
+        plot.title = element_text(hjust = 0.5, size = 24)) +
+  theme_nothing(legend = TRUE) +
+  coord_quickmap() +
+  transition_states(month, transition_length = 2, state_length = 1) +
+  labs(title = 'Month: {closest_state}') +
+  enter_fade() +
+  exit_fade()
+
+animate(anim)
