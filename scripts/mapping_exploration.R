@@ -142,3 +142,5 @@ geom_polygon(data=simple_map_US, aes(x=long, y=lat, group=group),
   exit_fade()
 
 animate(anim)
+
+anim_save("./output/n_californica_gif.gif", anim)
