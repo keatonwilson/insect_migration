@@ -42,8 +42,10 @@ get_clean_obs = function(species = NULL) {
           summarize(n()))
 }
 
-#Be wary of species name - difference here between the GBIF and iNat designations. If you don't get any results from both... something probably is amiss. 
+#Be wary of species name - difference here between the GBIF and iNat designations. If you don't get any results from both... something probably is amiss. i.e. WTF - why is GBIF calling quinqs "quinquemaculatus"
 get_clean_obs(species = "Manduca quinquemaculata")
+
+#An example of both
 get_clean_obs(species = "Bison bison")
 
 
