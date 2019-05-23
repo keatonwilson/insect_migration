@@ -33,8 +33,8 @@ get_clean_obs = function(species = NULL) {
     mutate(longitude = as.numeric(longitude),
            latitude = as.numeric(latitude)) %>%
     filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
-    filter(str_detect(name, species)) %>% #Only including names that match original species name
-    distinct() %>% #Filtering out duplicates between inat and GBIF
+    filter(str_detect(name, species)) %>% #Only including names that match original species name 
+    distinct(longitude, latitude, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
     as_tibble()
   
   print(occ_df %>%
@@ -42,10 +42,11 @@ get_clean_obs = function(species = NULL) {
           summarize(n()))
 }
 
+
+# Some warnings and examples ----------------------------------------------
+# 
 #Be wary of species name - difference here between the GBIF and iNat designations. If you don't get any results from both... something probably is amiss. i.e. WTF - why is GBIF calling quinqs "quinquemaculatus"
-get_clean_obs(species = "Manduca quinquemaculata")
+mq = get_clean_obs(species = "Manduca quinquemaculata")
 
 #An example of both
-get_clean_obs(species = "Bison bison")
-
-
+get_clean_obs(species = "Taricha granulosa")
