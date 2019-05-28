@@ -3,7 +3,7 @@
 #keatonwilson@me.com
 #2019-05-21
 #
-#remotes::install_github("ropensci/spocc", force = TRUE)
+# remotes::install_github("ropensci/spocc", dependencies = TRUE, force = TRUE)
 
 # Packages ----------------------------------------------------------------
 library(tidyverse)
@@ -17,7 +17,24 @@ register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")
 
 # Data Import -------------------------------------------------------------
 # Just GBIF for now - iNat is broken for grabbing this many records
-monarch_occ_gbif = occ("Danaus plexippus", from = c("gbif", "inat"), limit = 100000, has_coords = TRUE)
+
+occ_obs_1 = occ("Danaus plexippus", from = "gbif", limit = 1, has_coords = TRUE, gbifopts = list(country='US'))
+gbif_obs_num = occ_obs_1$gbif$meta$found #number of obs in gbif
+number_of_runs = ceiling(gbif_obs_num/10000)
+
+monarch_gbif_list = list()
+start = 0
+
+for (i in 1:number_of_runs) {
+  monarch_gbif_list[[i]] = occ("Danaus plexippus", from = c("gbif"), #Getting the full set of records and binding to list
+                          has_coords = TRUE,
+                          limit = 10000,
+                          start = start, 
+                          gbifopts = list(country = 'US'))
+  start = start + 10000
+  print(monarch_gbif_list[[i]])
+}
+
 
 # Cleaning and Filtering -------------------------------------------------
 # Filtering for Research Grade in inat
@@ -25,7 +42,7 @@ monarch_occ_gbif = occ("Danaus plexippus", from = c("gbif", "inat"), limit = 100
 #   filter(quality_grade == "research")
 
 # Turning into a data frame for further processing
-monarch_df = oc2df(monarch_occ)
+# monarch_df = occ2df(monarch_occ)
 
 # Manually Adding Mexican Winter Hectare Data -----------------------------
 
