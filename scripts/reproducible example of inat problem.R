@@ -16,11 +16,14 @@ monarch_500 = occ("Danaus plexippus", from = "inat", limit = 3200)
 monarch_500
 
 #Can we pull the total number (53,066) - keep in mind, this takes a while.
-monarch_full = occ("Danaus plexippus", from = "inat", limit = 53066)
-monarch_full
+monarch_bigger = occ("Danaus plexippus", from = "inat", limit = 18020)
+monarch_bigger
 
-#Nothing there - let's see if gbif works.
-monarch_full_gbif = occ("Danaus plexippus", from = "gbif", limit = 50000)
-monarch_full_gbif
+#This is particularly strange, because it pulls less than the limit (limit = 18020, returned = 10041), but still works? What happens if we
+#pull even more?
+#
+#
+monarch_bigger_still = occ("Danaus plexippus", from = "inat", limit = 20000)
+monarch_bigger_still
 
-#Quering GBIF seems to be functional - so it's an inat problem. 
+#And this is even weirder - now it pulls less than the total number, but slightly more than when the limit is set at 18020. 

@@ -21,6 +21,7 @@ library(maps)
 library(viridis)
 library(gganimate)
 library(transformr)
+
 #Map API
 #register google api for mapping stuff
 register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")

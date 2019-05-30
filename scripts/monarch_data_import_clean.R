@@ -35,19 +35,23 @@ for (i in 1:number_of_runs) {
   print(monarch_gbif_list[[i]])
 }
 
+#Ok, so we have a big list (20 items) that we need to turn into dataframes and bind together
+monarch_gbif_list[[1]][[1]][[2]]
 
+monarch_gbif_df = occ2df(monarch_gbif_list[[1]])
+for (j in 2:length(monarch_gbif_list)) {
+  df = occ2df(monarch_gbif_list[[j]])
+  monarch_gbif_df = bind_rows(df, monarch_gbif_df)
+}
 # Cleaning and Filtering -------------------------------------------------
-# Filtering for Research Grade in inat
-# monarch_occ$inat$data$`Danaus_plexippus` = monarch_occ$inat$data$`Danaus_plexippus` %>%
-#   filter(quality_grade == "research")
 
-# Turning into a data frame for further processing
-# monarch_df = occ2df(monarch_occ)
-
+monarch_gbif_df = monarch_gbif_df %>%
+  distinct(key, .keep_all = TRUE) %>%
+  mutate(month = month(date), 
+         year = year(date))
 # Manually Adding Mexican Winter Hectare Data -----------------------------
 
 #Might need to modify 2004 - apparently the data was collected early in the season, and may closer to 8-9 hectares. 
-
 winter = data.frame(year = seq(from = 1995, to = 2019),
                     hectares = c(7.81, 12.61, 18.19, 
                                  5.77, 5.56, 9.05,
@@ -59,4 +63,6 @@ winter = data.frame(year = seq(from = 1995, to = 2019),
                                  4.01, 2.91, 2.48, 
                                  6.05))
 
-
+#Saving the data
+write_csv(winter, "./data/monarch_winter.csv")
+write_csv(monarch_gbif_df, "./data/monarch_gbif.csv")

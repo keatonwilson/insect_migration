@@ -2,7 +2,10 @@
 #Keaton Wilson
 #keatonwilson@me.com
 #2019-05-23
-
+#
+# Currently non functional - need to incorporate rules for what to do when there are high numbers of occurence records
+# 
+# 
 # Packages ----------------------------------------------------------------
 library(tidyverse)
 library(spocc)
@@ -10,17 +13,23 @@ library(ggmap)
 library(mapr)
 library(lubridate)
 library(stringr)
+library(rgbif)
 
 
 # get_clean_obs function --------------------------------------------------
 
-get_clean_obs = function(species = NULL) {
-  occ_obs_1 = occ(species, from = c("gbif", "inat"), limit = 1, has_coords = TRUE) #querying with small number (1) to get total number of occurence records
+get_clean_obs = function(genus = NULL, species = NULL) {
+  
+  species_name = paste(genus, species, sep = " ") #Generating the full species name for searching
+  occ_obs_1 = occ(species_name, from = c("gbif", "inat"), limit = 1, has_coords = TRUE) #querying with small number (1) to get total number of occurence records
   gbif_obs_num = occ_obs_1$gbif$meta$found #number of obs in gbif
   inat_obs_num = occ_obs_1$inat$meta$found #number of obs in inat
   
-  if (gbif_obs_num < 10000 & inat_obs_num < 10000) { #Conditional - we can do single runs if it's less than 10000, but otherwise need to combine
-  occ_obs_full = occ(species, from = c("gbif", "inat"), #Getting the full set of records
+  #Conditional - we can do single runs if it's less than 10000, but otherwise need to combine
+  if (gbif_obs_num < 10000 & inat_obs_num < 10000) { 
+  
+  ## FOR RECORDS WITH LESS THAN 10k RECORDS
+  occ_obs_full = occ(species_name, from = c("gbif", "inat"), #Getting the full set of records
                      has_coords = TRUE,
                      inatopts = list(limit = inat_obs_num),
                      gbifopts = list(limit = gbif_obs_num))
@@ -30,97 +39,142 @@ get_clean_obs = function(species = NULL) {
   
   occ_df = occ2df(occ_obs_full) #Making a dataframe out of it
   
+  #Cleaning
   occ_df = occ_df %>%
     mutate(longitude = as.numeric(longitude),
            latitude = as.numeric(latitude)) %>%
     filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
-    filter(str_detect(name, species)) %>% #Only including names that match original species name 
-    distinct(longitude, latitude, date, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
+    filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
+    distinct(key) %>% #Filtering out duplicates between inat and GBIF
     as_tibble()
   
+  #Print off number from each group
   print(occ_df %>%
           group_by(prov) %>%
           summarize(n()))
-  } else { #Chunk of code for if there are more than 10k observations
-    biggest = max(gbif_obs_num, inat_obs_num) #determining the max number of records between gbif and inat
-    number_of_runs = ceiling(biggest/10000) #figuring out how many interations we'll need to do
+  
+  ## MORE THAN 10k OBSERVATIONS BELOW
+  } else {
+  
+    ## GBIF DATA
+    gbif_occ = occ_search(scientificName = species_name, #getting gbif records from rgbif function
+                          hasCoordinate = TRUE, 
+                          continent = "north_america", 
+                          limit = gbif_obs_num) 
     
-    occ_obs_list = list() #initalizing a list to hold all of the occ objects
+    gbif_df = gbif_occ$data #pulling out just the data
     
-    for (i in 1:number_of_runs) {
-      start = 1 #defining starting record
-      occ_obs_list[[i]] = occ(species, from = c("gbif", "inat"), #Getting the full set of records and binding to list
-                              has_coords = TRUE,
-                              limit = 10000,
-                              start = start)
-      start = start + 10000
+    #Cleaning
+    gbif_df = gbif_df %>%
+      select(longitude = decimalLongitude, 
+             latitude = decimalLatitude,
+             name = scientificName,
+             date = eventDate) %>%
+      mutate(date = date(date)) %>%
+      filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
+      filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
+      distinct(longitude, latitude, date, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
+      as_tibble()
+    
+    
+    #iNat Data
+    #The trick was to sequence through year by year. It reduces the pagination for each year, which gets around the hard limit of 10 pages (or 10k records)
+    
+    #Inat Loop
+    inat_df <- NULL #Initializing the data frame
+    year_sequence = 1975:(year(Sys.Date()))#Setting the years to sequence through
+    
+    #Start of the outer for loop to cycle through years
+    for (i in year_sequence) {
+      
+      page = 1
+      finished <- FALSE
+      
+      while (!finished & page < 100) { #Jeff's while loop (modified a bit)
+        obs.url <- paste0("http://inaturalist.org/observations.csv?&taxon_name=", 
+                          genus,
+                          "%20",
+                          species, 
+                          "&page=",
+                          page,
+                          "&year=",
+                          i,
+                          "&quality_grade=research&has[]=geo&per_page=200") #200 max per page, only research grade
+        
+        temp.data <- read.csv(obs.url) #storing the output csv as a temporary data frame
+        
+        if (nrow(temp.data) > 0) {
+          if (is.null(inat_df)) {
+            inat_df <- temp.data
+          } else {
+            inat_df <- bind_rows(inat_df, temp.data) #bind the new data onto obs.data
+          }
+        } else {
+          finished <- TRUE #Finish when there aren't any records in a data frame
+        }
+        page = page + 1 #Iterate to the next page
+        
+        if (nrow(temp.data) == 0) {
+          print("This year has no records from iNaturalist", quote = FALSE) 
+        } else {
+          print("Working...", quote = FALSE)
+        }
+        rm(temp.data)
+      }
+      if (is.null(inat_df)){
+        print(paste("Moving on to year", i+1), quote = FALSE)
+      } else {
+        print(paste("Your data set now has", inat_df %>%
+                      n_distinct(), "distinct record(s)."), quote = FALSE)
+        print(paste("Moving on to year", i), quote = FALSE)
+      }
     }
+    print(paste("Your data set now has", inat_df %>%
+                  n_distinct(), "distinct record(s)"), quote = FALSE)
     
-    print(occ_obs_list) #print off to see if the list is working
+    print("Finished searching iNat", quote = FALSE)
+    
+    #Cleaning inat Data
+    inat_df = inat_df %>%
+      select(name = scientific_name,
+             date = datetime, 
+             latitude, 
+             longitude, 
+             key = id) %>%
+      mutate(date = date(date)) %>%
+      filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
+      filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
+      distinct(key, .keep_all = TRUE) %>%#Filtering out duplicates within inat
+      select(-key) %>%
+      as_tibble()
+    
+    #Combining GBIF and iNat into single dataframe
+    occ_df = bind_rows(gbif_df, inat_df, .id = "prov")
+    occ_df = occ_df %>%
+      mutate(prov = factor(prov, labels = c("gbif", "inat"))) %>%
+      distinct(date, latitude, longitude, .keep_all = TRUE) #Filtering out duplicates among the data set
+    
+    print(occ_df %>%
+            group_by(prov) %>%
+            summarize(n()))
   }
+  #Printing summary
+  print(paste("Search returned", nrow(occ_df), "records"), quotes = FALSE)
+  occ_df
 }
 
 
 # Some warnings and examples ----------------------------------------------
 # 
 #Be wary of species name - difference here between the GBIF and iNat designations. If you don't get any results from both... something probably is amiss. i.e. WTF - why is GBIF calling quinqs "quinquemaculatus"
-mq = get_clean_obs(species = "Manduca quinquemaculata")
+#
+#Tests
+#Low records
+df_test = get_clean_obs(genus = "Manduca", species = "rustica")
 
-#An example of both
-get_clean_obs(species = "Taricha granulosa")
-
-
-get_clean_obs(species = "Lithobates catesbeianus")
-
-#replicating the above manually to make sure it works
-occ_obs_1 = occ("Lithobates catesbeianus", from = c("gbif", "inat"), limit = 1, has_coords = TRUE)
-gbif_obs_num = occ_obs_1$gbif$meta$found #number of obs in gbif
-inat_obs_num = occ_obs_1$inat$meta$found #number of obs in inat
-biggest = max(gbif_obs_num, inat_obs_num) #determining the max number of records between gbif and inat
-number_of_runs = ceiling(biggest/10000)
-
-occ_obs_list = list() #initalizing a list to hold all of the occ objects
-start = 1 #defining starting record
-
-for (i in 1:number_of_runs) {
-  occ_obs_list[[i]] = occ("Lithobates catesbeianus", from = c("gbif", "inat"), #Getting the full set of records and binding to list
-                          has_coords = TRUE,
-                          limit = 10000,
-                          inatopts = list(page = start),
-                          gbifopts = list(start = start))
-  start = start + 10000
-}
-
-print(occ_obs_list)
-df_1  = occ2df(occ_obs_list[[1]])
-df_2 = occ2df(occ_obs_list[[2]])
-df_3 = occ2df(occ_obs_list[[3]])
-
-test_occ_2 = occ("Lithobates catesbeianus", from = c("gbif", "inat"), #Getting the full set of records and binding to list
-               has_coords = TRUE,
-               limit = 10000,
-               start = 10001)
-
-test_df_2 = occ2df(test_occ_2)
-
-test_df_2 == df_2
-
-big_df = bind_rows(df_1, df_2, df_3)
-
-big_df %>%
-  filter(prov == "inat") %>%
-  distinct()
-
-big_df %>%
-  distinct(longitude, latitude, .keep_all = TRUE) %>%
-  group_by(prov) %>%
-  summarize(n())
+##Bigger records
+df_test_2 = get_clean_obs(genus = "Lithobates", species = "catesbeianus")
 
 
-one = occ("Danaus plexippus", from = "inat", limit = 5, page = 1)
-two = occ("Danaus plexippus", from = "inat", limit = 5, start = 2)
 
-one = occ2df(one)
-two = occ2df(two)
 
-one == two
