@@ -3,9 +3,6 @@
 #keatonwilson@me.com
 #2019-05-23
 #
-# Currently non functional - need to incorporate rules for what to do when there are high numbers of occurence records
-# 
-# 
 # Packages ----------------------------------------------------------------
 library(tidyverse)
 library(spocc)
