@@ -75,7 +75,7 @@ get_clean_obs = function(genus = NULL, species = NULL) {
     
     
     #iNat Data
-    #The trick was to sequence through year by year. It reduces the pagination for each year, which gets around the hard limit of 10 pages (or 10k records)
+    #The trick was to sequence through year by year. It reduces the pagination for each year, which gets around the hard limit of 100 pages (or 10k records)
     
     #Inat Loop
     inat_df <- NULL #Initializing the data frame
