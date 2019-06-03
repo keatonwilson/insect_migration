@@ -80,56 +80,73 @@ get_clean_obs = function(genus = NULL, species = NULL) {
     #Inat Loop
     inat_df <- NULL #Initializing the data frame
     year_sequence = 1975:(year(Sys.Date()))#Setting the years to sequence through
+    month_sequence = 1:12
     
     #Start of the outer for loop to cycle through years
     for (i in year_sequence) {
       
-      page = 1
-      finished <- FALSE
-      
-      while (!finished & page < 100) { #Jeff's while loop (modified a bit)
-        obs.url <- paste0("http://inaturalist.org/observations.csv?&taxon_name=", 
-                          genus,
-                          "%20",
-                          species, 
-                          "&page=",
-                          page,
-                          "&year=",
-                          i,
-                          "&quality_grade=research&has[]=geo&per_page=200") #200 max per page, only research grade
+      for (j in month_sequence) {
+        n_records_per_month = nrow(inat_df)
+        page = 1
+        finished <- FALSE
         
-        temp.data <- read.csv(obs.url) #storing the output csv as a temporary data frame
-        
-        if (nrow(temp.data) > 0) {
-          if (is.null(inat_df)) {
-            inat_df <- temp.data
+        while (!finished & page < 100) { #Jeff's while loop (modified a bit)
+          obs.url <- paste0("http://inaturalist.org/observations.csv?&taxon_name=", 
+                            genus,
+                            "%20",
+                            species, 
+                            "&page=",
+                            page,
+                            "&year=",
+                            i,
+                            "&month=",
+                            j,
+                            "&quality_grade=research&has[]=geo&per_page=200") #200 max per page, only research grade
+          
+          temp.data <- read.csv(obs.url) #storing the output csv as a temporary data frame
+          
+          if (nrow(temp.data) > 0) {
+            if (is.null(inat_df)) {
+              inat_df <- temp.data
+            } else {
+              inat_df <- bind_rows(inat_df, temp.data) #bind the new data onto inat_df
+            }
           } else {
-            inat_df <- bind_rows(inat_df, temp.data) #bind the new data onto obs.data
+            finished <- TRUE #Finish when there aren't any records in a data frame
           }
-        } else {
-          finished <- TRUE #Finish when there aren't any records in a data frame
+          
+          page = page + 1 #Iterate to the next page
+          
+          if (nrow(temp.data) == 0) {
+            print("This page has no records from iNaturalist", quote = FALSE) 
+          } else {
+            print("Working...", quote = FALSE)
+          }
+          
+          rm(temp.data)
         }
-        page = page + 1 #Iterate to the next page
         
-        if (nrow(temp.data) == 0) {
-          print("This year has no records from iNaturalist", quote = FALSE) 
-        } else {
-          print("Working...", quote = FALSE)
-        }
-        rm(temp.data)
+        print(paste("Month", j, "had", 
+                    ifelse(is.null(nrow(inat_df)), 0,
+                           nrow(inat_df) - n_records_per_month),
+                    "records"),
+              quote = FALSE)
+        
       }
+      
       if (is.null(inat_df)){
         print(paste("Moving on to year", i+1), quote = FALSE)
       } else {
         print(paste("Your data set now has", inat_df %>%
                       n_distinct(), "distinct record(s)."), quote = FALSE)
-        print(paste("Moving on to year", i), quote = FALSE)
+        print(paste("Moving on to year", i+1), quote = FALSE)
       }
     }
     print(paste("Your data set now has", inat_df %>%
                   n_distinct(), "distinct record(s)"), quote = FALSE)
     
     print("Finished searching iNat", quote = FALSE)
+    
     
     #Cleaning inat Data
     inat_df = inat_df %>%
@@ -167,11 +184,10 @@ get_clean_obs = function(genus = NULL, species = NULL) {
 #
 #Tests
 #Low records
-df_test = get_clean_obs(genus = "Manduca", species = "rustica")
-
-##Bigger records
+# df_test = get_clean_obs(genus = "Manduca", species = "rustica")
+# 
+# ##Bigger records
 df_test_2 = get_clean_obs(genus = "Lithobates", species = "catesbeianus")
-
 
 
 
