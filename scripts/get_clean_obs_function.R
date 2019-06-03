@@ -227,20 +227,20 @@ longitude_in_bounds = function(longitude, lonbounds = c(-180, 180)) {
 # df_test = get_clean_obs(genus = "Manduca", species = "rustica")
 # 
 # ##Bigger records
-df_test_2 = get_clean_obs(genus = "Lithobates", species = "catesbeianus")
-
-# Restricting to smaller area (roughly Arizona)
-df_test_3 = get_clean_obs(genus = "Manduca", species = "rustica", 
-                          lonlim = c(-115, -109), latlim = c(31, 37))
-
-# Test for records spanning international date line
-df_test_4 = get_clean_obs(genus = "Phalaropus", species = "lobatus", 
-                          lonlim = c(170, -170), latlim = c(62, 70))
-
-
-# Tests that should fail due to invalid lat/lon
-df_test_5_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
-                               lonlim = c(175, 195), latlim = c(31, 37))
-
-df_test_6_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
-                               lonlim = -170, latlim = 37)
+# df_test_2 = get_clean_obs(genus = "Lithobates", species = "catesbeianus")
+# 
+# # Restricting to smaller area (roughly Arizona)
+# df_test_3 = get_clean_obs(genus = "Manduca", species = "rustica", 
+#                           lonlim = c(-115, -109), latlim = c(31, 37))
+# 
+# # Test for records spanning international date line
+# df_test_4 = get_clean_obs(genus = "Phalaropus", species = "lobatus", 
+#                           lonlim = c(170, -170), latlim = c(62, 70))
+# 
+# 
+# # Tests that should fail due to invalid lat/lon
+# df_test_5_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
+#                                lonlim = c(175, 195), latlim = c(31, 37))
+# 
+# df_test_6_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
+#                                lonlim = -170, latlim = 37)
