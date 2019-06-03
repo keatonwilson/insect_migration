@@ -52,12 +52,13 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
     filter(longitude_in_bounds(longitude, lonlim) & latitude > latlim[1] & latitude < latlim[2]) %>%
     filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
     distinct(key, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
+    select(-key) %>%
     as_tibble()
   
   #Print off number from each group
   print(occ_df %>%
           group_by(prov) %>%
-          summarize(n()))
+          summarize(number_obs = n()))
   
   ## MORE THAN 10k OBSERVATIONS BELOW
   } else {
@@ -90,6 +91,7 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
     inat_df <- NULL #Initializing the data frame
     year_sequence = 1975:(year(Sys.Date()))#Setting the years to sequence through
     month_sequence = 1:12
+    options(readr.num_columns = 0) # Turning off readr messages
     
     #Start of the outer for loop to cycle through years
     for (i in year_sequence) {
@@ -112,7 +114,12 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
                             j,
                             "&quality_grade=research&has[]=geo&per_page=200") #200 max per page, only research grade
           
-          temp.data <- read.csv(obs.url) #storing the output csv as a temporary data frame
+          temp.data <- read_csv(obs.url) %>% #storing the output csv as a temporary data frame
+                        select(scientific_name, 
+                               datetime,
+                               latitude,
+                               longitude, 
+                               id)
           
           if (nrow(temp.data) > 0) {
             if (is.null(inat_df)) {
@@ -164,7 +171,10 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
              latitude, 
              longitude, 
              key = id) %>%
-      mutate(date = date(date)) %>%
+      mutate(date = date(date), 
+             name = as.character(name), 
+             longitude = as.numeric(longitude), 
+             latitude = as.numeric(latitude)) %>%
       filter(longitude_in_bounds(longitude, lonlim) & latitude > latlim[1] & latitude < latlim[2]) %>%
       filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
       distinct(key, .keep_all = TRUE) %>%#Filtering out duplicates within inat
@@ -174,7 +184,8 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
     #Combining GBIF and iNat into single dataframe
     occ_df = bind_rows(gbif_df, inat_df, .id = "prov")
     occ_df = occ_df %>%
-      mutate(prov = factor(prov, labels = c("gbif", "inat"))) %>%
+      mutate(prov = ifelse(prov == 1, "gbif", "inat")) %>%
+      mutate(prov = as.factor(prov)) %>%
       distinct(date, latitude, longitude, .keep_all = TRUE) #Filtering out duplicates among the data set
     
     print(occ_df %>%
@@ -226,12 +237,10 @@ df_test_3 = get_clean_obs(genus = "Manduca", species = "rustica",
 df_test_4 = get_clean_obs(genus = "Phalaropus", species = "lobatus", 
                           lonlim = c(170, -170), latlim = c(62, 70))
 
-<<<<<<< HEAD
-=======
+
 # Tests that should fail due to invalid lat/lon
 df_test_5_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
                                lonlim = c(175, 195), latlim = c(31, 37))
 
 df_test_6_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
                                lonlim = -170, latlim = 37)
->>>>>>> d0d5985b8905a398ee084b6025e744f2a63859f2
