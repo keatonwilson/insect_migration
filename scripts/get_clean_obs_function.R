@@ -15,7 +15,16 @@ library(rgbif)
 
 # get_clean_obs function --------------------------------------------------
 
-get_clean_obs = function(genus = NULL, species = NULL) {
+get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), latlim = c(15, 70)) {
+  # lonlim vector should be in (western boundary, eastern boundary) order to 
+  # accommodate bounding box that crosses international date line
+  # Some defensive programming for invalid lat/long limits
+  if (length(lonlim) != 2 | length(latlim) != 2) {
+    stop("get_clean_obs requires longitude and latitude limit vectors of length 2")
+  }
+  if (any(lonlim < -180 | lonlim > 180 | latlim < -90 | latlim > 90)) {
+    stop("get_clean_obs requires valid latitude and longitude limits (-90 to 90 and -180 to 180, respectively)")
+  }
   
   species_name = paste(genus, species, sep = " ") #Generating the full species name for searching
   occ_obs_1 = occ(species_name, from = c("gbif", "inat"), limit = 1, has_coords = TRUE) #querying with small number (1) to get total number of occurence records
@@ -40,9 +49,9 @@ get_clean_obs = function(genus = NULL, species = NULL) {
   occ_df = occ_df %>%
     mutate(longitude = as.numeric(longitude),
            latitude = as.numeric(latitude)) %>%
-    filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
+    filter(longitude_in_bounds(longitude, lonlim) & latitude > latlim[1] & latitude < latlim[2]) %>%
     filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
-    distinct(key) %>% #Filtering out duplicates between inat and GBIF
+    distinct(key, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
     as_tibble()
   
   #Print off number from each group
@@ -68,7 +77,7 @@ get_clean_obs = function(genus = NULL, species = NULL) {
              name = scientificName,
              date = eventDate) %>%
       mutate(date = date(date)) %>%
-      filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
+      filter(longitude_in_bounds(longitude, lonlim) & latitude > latlim[1] & latitude < latlim[2]) %>%
       filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
       distinct(longitude, latitude, date, .keep_all = TRUE) %>% #Filtering out duplicates between inat and GBIF
       as_tibble()
@@ -139,7 +148,7 @@ get_clean_obs = function(genus = NULL, species = NULL) {
              longitude, 
              key = id) %>%
       mutate(date = date(date)) %>%
-      filter(longitude > -165 & longitude < -45 & latitude > 15 & latitude < 70) %>% #Filtering for North America
+      filter(longitude_in_bounds(longitude, lonlim) & latitude > latlim[1] & latitude < latlim[2]) %>%
       filter(str_detect(name, species_name)) %>% #Only including names that match original species name 
       distinct(key, .keep_all = TRUE) %>%#Filtering out duplicates within inat
       select(-key) %>%
@@ -160,6 +169,26 @@ get_clean_obs = function(genus = NULL, species = NULL) {
   occ_df
 }
 
+#' Test whether \code{longitude} is within the bounds of \code{lonbounds}
+#' 
+#' @param longitude a numeric decimal longitude
+#' @param lonbounds numeric vector of length two giving the western and eastern
+#' boundaries, respective, for test
+#' @return logical indicating whether the passed \code{longitude} is within the 
+#' boundaries defined by \code{lonbounds}. Accounts for the possibility that the 
+#' boundaries cross 180/-180 longitude.
+longitude_in_bounds = function(longitude, lonbounds = c(-180, 180)) {
+  if (length(lonbounds) != 2) {
+    stop("lonbounds argument in longitude_in_bounds must be of length 2")
+  }
+  if (lonbounds[1] > lonbounds[2]) { # Crossing date line
+    in_bounds = (longitude > lonbounds[1] & longitude <= 180) |
+                 (longitude < lonbounds[2] & longitude >= -180)
+  } else { # Not crossing, can do normal comparison
+    in_bounds = longitude > lonbounds[1] & longitude < lonbounds[2]
+  }
+  return(in_bounds)
+}
 
 # Some warnings and examples ----------------------------------------------
 # 
@@ -172,6 +201,17 @@ df_test = get_clean_obs(genus = "Manduca", species = "rustica")
 ##Bigger records
 df_test_2 = get_clean_obs(genus = "Lithobates", species = "catesbeianus")
 
+# Restricting to smaller area (roughly Arizona)
+df_test_3 = get_clean_obs(genus = "Manduca", species = "rustica", 
+                          lonlim = c(-115, -109), latlim = c(31, 37))
 
+# Test for records spanning international date line
+df_test_4 = get_clean_obs(genus = "Phalaropus", species = "lobatus", 
+                          lonlim = c(170, -170), latlim = c(62, 70))
 
+# Tests that should fail due to invalid lat/lon
+df_test_5_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
+                               lonlim = c(175, 195), latlim = c(31, 37))
 
+df_test_6_fail = get_clean_obs(genus = "Manduca", species = "rustica", 
+                               lonlim = -170, latlim = 37)
