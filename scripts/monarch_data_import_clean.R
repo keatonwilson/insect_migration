@@ -3,7 +3,7 @@
 #keatonwilson@me.com
 #2019-05-21
 #
-# remotes::install_github("ropensci/spocc", dependencies = TRUE, force = TRUE)
+#remotes::install_github("ropensci/spocc", dependencies = TRUE, force = TRUE)
 
 # Packages ----------------------------------------------------------------
 library(tidyverse)
@@ -66,9 +66,3 @@ winter = data.frame(year = seq(from = 1995, to = 2019),
 #Saving the data
 write_csv(winter, "./data/monarch_winter.csv")
 write_csv(monarch_gbif_df, "./data/monarch_gbif.csv")
-
-
-#Testing the get_clean_obs function for this. 
-source("./scripts/get_clean_obs_function.R")
-
-monarch_df = get_clean_obs(genus = "Danaus", species = "plexippus")

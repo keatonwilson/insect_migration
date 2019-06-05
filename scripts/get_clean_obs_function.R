@@ -66,8 +66,7 @@ get_clean_obs = function(genus = NULL, species = NULL, lonlim = c(-165, -45), la
     ## GBIF DATA
     gbif_occ = occ_search(scientificName = species_name, #getting gbif records from rgbif function
                           hasCoordinate = TRUE, 
-                          continent = "north_america", 
-                          limit = gbif_obs_num) 
+                          limit = 200000) #hard limit of 200k
     
     gbif_df = gbif_occ$data #pulling out just the data
     
