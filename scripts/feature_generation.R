@@ -9,6 +9,7 @@ library(lubridate)
 library(ggmap)
 library(stringr)
 library(purrr)
+library(revgeo)
 
 register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")
 
@@ -18,14 +19,23 @@ monarch_winter = read_csv("./data/monarch_winter.csv")
 
 #Adding some geocode information to the monarch data
 monarch_loc = monarch %>%
-  select(longitude, latitude)
+  select(longitude, latitude) 
 
-#Generating a list of loc vectors to feed into revgeocode
-loc_ls = map(transpose(monarch_loc), unlist, use.names = FALSE)
 
-#applying revgeocode to the items in the list (beware, this takes a while)
-locs = lapply(loc_ls, function(x) revgeocode(x, override_limit = TRUE)) 
+#Feeding data to revgeo so avoid throttling and memory issues
+locs = c()
+start = Sys.time()
+start_index = 1
+start = Sys.time()
 
+for (i in 1:nrow(monarch_loc)) {
+  rec = monarch_loc[i,]
+  latlon = c(rec$longitude, rec$latitude)
+  loc = revgeocode(latlon)
+  locs[i]  = loc
+  Sys.sleep(sample(c(0.5:2), size = 1))
+}
+end = Sys.time()
 #So the general idea here is to start to build the feature set to feed into a ML model. 
 # Feature list: 
 # 1. Date of first sighting in the US (previous year)
@@ -36,6 +46,7 @@ locs = lapply(loc_ls, function(x) revgeocode(x, override_limit = TRUE))
 
 #First step is setting up the dataframe that all of this will populate
 monarch_ml_df = monarch_winter
+
 
 #inspecting
 print(monarch_ml_df, n=30)
