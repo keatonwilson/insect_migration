@@ -10,6 +10,8 @@ library(ggmap)
 library(stringr)
 library(purrr)
 library(revgeo)
+library(RNetCDF)
+library(daymetr)
 
 register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")
 
@@ -94,6 +96,26 @@ monarch_ml_df = monarch %>%
   select(year, hectares, day_first_sighting, obs_37_norm, active_months_obs_norm, n_obs_total) %>%
   print(n = 50)
 
-  
-  
+#Active environmental conditions (March-October)
+ 
+#Need to get terraclim data
+
+lon_min = -110
+lon_max = -80
+lat_min = 25
+lat_max = 50
+
+#Enter lat and lon ranges
+lat.range=c(25, 50)        #! Ranges instead of point values. Order does not matter
+lon.range=c(-110, -80)
+
+
+#Pulling data
+env_data = download_daymet_ncss(location = c(50, -110, 25, -80),
+                                start = 1994,
+                                end = 2018,
+                                frequency = "monthly",
+                                param = c("tmin","tmax", "prcp"),
+                                path = tempdir(),
+                                silent = TRUE)
 
