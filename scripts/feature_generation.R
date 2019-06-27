@@ -174,7 +174,7 @@ library(prism)
 # 
 # #Saving list of biovars for each year
 # saveRDS(biovar_list, "./data/biovar.rds")
-
+biovar_list = readRDS("./data/biovar.rds")
 #Cropping - Feature #1 Total Area
 lon_min = -110
 lon_max = -80
