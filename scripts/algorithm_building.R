@@ -13,7 +13,7 @@ library(doParallel)
 
 #parallel processing
 cores = detectCores()
-doParallel::registerDoParallel(cores = 4)
+doParallel::registerDoParallel(cores = cores)
 
 #Set seed
 set.seed(42)

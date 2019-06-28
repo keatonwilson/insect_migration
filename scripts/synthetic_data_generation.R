@@ -15,7 +15,7 @@ monarch_data = read_csv("./data/monarch_data_real.csv")
 smooth_list = as.list(rep("density", 44))
 names(smooth_list) = names(monarch_data)
 
-syn_monarch = synthpop::syn(monarch_data, k = 10000, smoothing = smooth_list)
+syn_monarch = synthpop::syn(monarch_data, k = 100000, smoothing = smooth_list)
 
 compare(syn_monarch, monarch_data)
 
