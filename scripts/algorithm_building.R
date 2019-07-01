@@ -12,8 +12,8 @@ library(caretEnsemble)
 library(doParallel)
 
 #parallel processing
-cores = detectCores()
-doParallel::registerDoParallel(cores = cores)
+# cores = detectCores()
+# doParallel::registerDoParallel(cores = 2)
 
 #Set seed
 set.seed(42)
@@ -35,7 +35,7 @@ monarch_real = monarch_real %>%
 
 #A fair amount of missing, but we can try and impute 
 #Building the recipe
-monarch_rec = monarch_synth %>%
+monarch_rec = head(monarch_synth) %>%
   recipe(hectares ~ .) %>%
   step_bagimpute(all_predictors()) %>%
   step_YeoJohnson(all_predictors()) %>%
@@ -44,11 +44,11 @@ monarch_rec = monarch_synth %>%
   step_nzv(all_predictors())
 
 #Prepping
-prepped_monarch = prep(monarch_rec, training = monarch_synth)
+prepped_monarch = prep(monarch_rec, training = monarch_synth, retain = FALSE)
 
 monarch_train_data = bake(prepped_monarch, new_data = monarch_synth)
 monarch_test_data = bake(prepped_monarch, new_data = monarch_real)
-
+rm(prepped_monarch)
 #Modeling
 #Let's try a simple linear regression first
 train_control = trainControl(method = "repeatedcv", number = 3, repeats = 3)
@@ -67,6 +67,7 @@ rf_mod = train(hectares ~ ., data = monarch_train_data,
 
 summary(rf_mod)
 rf_mod
+saveRDS(rf_mod, "./output/rf_model.rds")
 
 monarch_synth %>%
   ggplot(aes(x = hectares)) +
@@ -84,4 +85,5 @@ ridge_lasso_mod = train(hectares ~ ., data = monarch_train_data,
 
 ridge_lasso_mod
 summary(ridge_lasso_mod)
+saveRDS(ridge_lasso_mod, "./output/ridge_lasso_mod.rds")
 
