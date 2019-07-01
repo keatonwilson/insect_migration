@@ -87,3 +87,13 @@ ridge_lasso_mod
 summary(ridge_lasso_mod)
 saveRDS(ridge_lasso_mod, "./output/ridge_lasso_mod.rds")
 
+#Running models on test data
+rf_mod_fit = predict(rf_mod, monarch_test_data)
+xgboost_mod_fit = predict(xgboost_mod, monarch_test_data)
+lm_mod_fit = predict(lm_mod, monarch_test_data)
+ridge_lasso_fit = predict(ridge_lasso_mod, monarch_test_data)
+
+postResample(pred = rf_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = xgboost_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = lm_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = ridge_lasso_fit, obs = monarch_test_data$hectares)
