@@ -38,11 +38,12 @@ monarch_real = monarch_real %>%
 monarch_rec = head(monarch_synth) %>%
   recipe(hectares ~ .) %>%
   step_bagimpute(all_predictors()) %>%
-  step_YeoJohnson(all_predictors()) %>%
+  step_nzv(all_predictors()) %>%
   step_center(all_predictors()) %>%
   step_scale(all_predictors()) %>%
-  step_nzv(all_predictors()) %>%
-  step_kpca(all_predictors())
+  step_kpca(bio_1_whole_range:bio_19_nrange, threshold = 0.95)
+  
+  
 
 #Prepping
 prepped_monarch = prep(monarch_rec, training = monarch_synth, retain = FALSE)
