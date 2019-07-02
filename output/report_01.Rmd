@@ -1,0 +1,20 @@
+---
+title: "Predicting Hectares in Mexico with Machine Learning Models"
+author: "Keaton Wilson"
+date: "7/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction  
+The basic goal of this project is to generate a Machine Learning model (or models) that predicts hectares in Mexico of Eastern Monarchs (a problematic, but common measure of population success). A few challenges:  
+1. There are only ~ 24-25 years of data.  
+2. What features/variables do we use?  
+
+## ML with Small Data  
+
+The strategy here is to build a full feature set for our small "real" data, and then use the `synthpop` package to generate a larger data set (~25k observations)
+
