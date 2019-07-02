@@ -1,5 +1,5 @@
 ---
-title: "Predicting Hectares in Mexico with Machine Learning Models"
+title: "Predicting Monarchs in Mexico with Machine Learning Models"
 author: "Keaton Wilson"
 date: "7/2/2019"
 output: html_document
@@ -7,14 +7,172 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/Projects/insect_migration/")
 ```
 
 # Introduction  
-The basic goal of this project is to generate a Machine Learning model (or models) that predicts hectares in Mexico of Eastern Monarchs (a problematic, but common measure of population success). A few challenges:  
+The basic goal of this project is to generate a Machine Learning model (or models) that predicts hectares in Mexico of Eastern Monarchs (a problematic, but common measure of population success) using citizen-science data and publicly available environmental data. A few challenges:  
 1. There are only ~ 24-25 years of data.  
 2. What features/variables do we use?  
 
-## ML with Small Data  
+### ML with Small Data  
 
-The strategy here is to build a full feature set for our small "real" data, and then use the `synthpop` package to generate a larger data set (~25k observations)
+The strategy here is to build a full feature set for our small "real" data, and then use the `synthpop` package to generate a larger data set (~25k observations) of synthetic data based on the properties of the original data set. Then, we'll train ML models on the synthetic data and use the 'real' data to evaluate.  
 
+### Appropriate Feature Building  
+The other tricky thing here is building the appropriate variables. Most of this comes out of a [blog post by Chip Taylor](https://monarchwatch.org/blog/2019/05/02/monarch-population-status-39/).  
+
+The features I used here are:  
+1. The date of first sighting in the US  
+2. Number of sightings above 37º latitude  
+3. Total number of sightings between March and October  
+4. Environmental conditions (19 bioclim variables) of the entire eastern corridor  
+5. Environmental conditions (19 bioclim variables) of the northern part of the territory (above 37º, that will end up creating 'migratory' morphs)  
+
+## Data Collection and Feature Generation  
+### Data Collection  
+
+I used the custom `get_clean_obs` function (a wrapper for spocc) that pulls all (or most, depending on the number of records) of records from GBIF and inat.  After some cleaning, filtering and reverse geocoding, we get the table below.  
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+monarch = read_csv("./data/monarch_w_locs.csv")
+glimpse(read_csv("./data/monarch_w_locs.csv"))
+
+```
+
+This is a substantial data set, and we can plot it to look to see if the records make sense.  
+
+```{r echo=FALSE, message=FALSE, warning = FALSE}
+library(ggmap)
+library(mapr)
+register_google(key = "AIzaSyDyAqUc4o9p_DOBSF_JOXH5c_JXPqoU4Yw")
+
+america = get_map(location = "Kansas", source = "stamen", zoom = 3)
+ggmap(america) +
+  geom_point(data = monarch, aes(x = longitude, y = latitude), size = 0.5, alpha = 0.2)
+```
+
+ 
+```{r, echo = FALSE}
+#First step is setting up the dataframe that all of this will populate
+#Reading in monarch winter data
+monarch_winter = read_csv("./data/monarch_winter.csv")
+monarch_ml_df = monarch_winter
+
+#inspecting
+print(monarch_ml_df, n=30)
+
+#Changing dates to December dates - i.e. the year reflects the year in December, not in January when the records were collected. 
+monarch_ml_df$year = monarch_ml_df$year - 1
+
+#extracting location info and cleaning up
+monarch$country = str_extract(monarch$locs, '\\b[^,]+$')
+unique(monarch$country)
+
+na_country_list = c("USA", "Mexico", "Puerto Rico", "Canada", "United States")
+
+monarch_country_sub = monarch %>%
+  filter(country %in% na_country_list) %>%
+  mutate(country = str_replace(country, "United States", "USA"), 
+         country = str_replace(country, "Peurto Rico", "USA"))
+```
+
+### Feature 1. Date of first sighting
+```{r}
+library(lubridate)
+first_us_sighting = monarch_country_sub %>%
+  mutate(year = year(date)) %>% 
+  filter(country == "USA") %>%
+  filter(str_detect(locs, "TX|Texas|NM|New Mexico|OK|Oklahoma|AZ|Arizona")) %>% #Restricting to states that make sense
+  group_by(year) %>%
+  summarize(first_sighting = min(date), 
+            n = n()) %>%
+  print(n = 50)
+
+```
+So, they're really all over the place, but they appear to be getting sooner as time goes on? Interesting. Regardless, we're going to bind them to the master data frame  
+
+```{r}
+#binding
+monarch_ml_df = monarch_ml_df %>%
+  left_join(first_us_sighting, by = "year") %>%
+  mutate(day_first_sighting = lubridate::yday((first_sighting))) %>%
+  dplyr::select(-first_sighting)
+```
+
+### Feature 2. Number of sightings north of 37º  
+Adding a feature that is the number of sightings north of 37º divided by/normalized by the total number of sightings for a year  
+
+```{r}
+monarch_ml_df = monarch %>%
+  mutate(year = year(date)) %>%
+  group_by(year) %>%
+  summarize(n_obs_total = n()) %>%
+  right_join(monarch_ml_df, by = "year") %>%
+  left_join(monarch %>%
+               mutate(year = year(date)) %>%
+               filter(latitude > 37) %>%
+               group_by(year) %>%
+               summarize(n_obs_37 = n()), by = "year") %>%
+  mutate(obs_37_norm = n_obs_37/n_obs_total) %>%
+  dplyr::select(year, hectares, day_first_sighting, obs_37_norm) %>%
+  print(n = 50)
+```
+
+### Feature 3. Number of sightings during the active season (March-October)  
+Adding a feature that is the number of sightings during the active season divided by/normalied by the total number of sightings for a year.  
+
+```{r}
+monarch_ml_df = monarch %>%
+  mutate(year = year(date), 
+         month = month(date)) %>%
+  filter(month %in% 3:10) %>%
+  group_by(year) %>%
+  summarize(active_months_obs = n()) %>% 
+  right_join(monarch_ml_df, by = "year") %>%
+  left_join(monarch %>%
+              mutate(year = year(date)) %>%
+              group_by(year) %>%
+              summarize(n_obs_total = n()), by = "year") %>%
+  mutate(active_months_obs_norm = active_months_obs/n_obs_total) %>%
+  dplyr::select(year, hectares, day_first_sighting, obs_37_norm, active_months_obs_norm, n_obs_total) %>%
+  print(n = 50)
+```
+
+### Feature 4 and 5  
+Adding a bunch of features. The idea here is to generate summaries of bioclim variables (of which there are 19) for two geographic regions. The first is the whole eastern chunk, and the second is the northern range, or the part of range that generates migratory morphs, boundary boxes shown below. 
+
+```{r}
+#Cropping - Feature #1 Total Area
+lon_min = -110
+lon_max = -80
+lat_min = 25
+lat_max = 50
+
+#feature 2 area
+lon_min_2 = -110
+lon_max_2 = -80
+lat_min_2 = 37
+lat_max_2 = 50
+
+ggmap(america) +
+  geom_rect(aes(xmin = lon_min, ymin = lat_min, xmax = lon_max, ymax = lat_max),
+             color = "red", alpha = 0.1) +
+  geom_rect(aes(xmin = lon_min_2, ymin = lat_min_2, xmax = lon_max_2, ymax = lat_max_2),
+             color = "blue", alpha = 0.1, lty = 2) +
+  annotate("text", x = -105, y = 51, label = "Northern Boundary Box", size = 2, hjust = 0, color = "blue") +
+  annotate("text", x = -75, y = 38, label = "Eastern Habitat Boundary Box", size = 2, hjust = 0, color = "red")
+```
+
+A lot of prism environmental data wrangling here, but the big thing is averaging bioclim cells for each area for each year. 
+
+```{r, echo = FALSE, warning = FALSE, message=FALSE}
+monarch_ml_df = read_csv("./data/monarch_data_real.csv")
+```
+
+```{r}
+glimpse(monarch_ml_df)
+```
+
+So, we've finally got a really big feature set (44 variables!). For information on what each bioclim variable represents, check out [this link](https://www.worldclim.org/bioclim).  
