@@ -41,7 +41,8 @@ monarch_rec = head(monarch_synth) %>%
   step_YeoJohnson(all_predictors()) %>%
   step_center(all_predictors()) %>%
   step_scale(all_predictors()) %>%
-  step_nzv(all_predictors())
+  step_nzv(all_predictors()) %>%
+  step_kpca(all_predictors())
 
 #Prepping
 prepped_monarch = prep(monarch_rec, training = monarch_synth, retain = FALSE)
