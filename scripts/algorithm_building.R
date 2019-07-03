@@ -37,11 +37,10 @@ monarch_real = monarch_real %>%
 #Building the recipe
 monarch_rec = head(monarch_synth) %>%
   recipe(hectares ~ .) %>%
-  step_bagimpute(all_predictors()) %>%
+  step_knnimpute(all_predictors()) %>%
   step_nzv(all_predictors()) %>%
   step_center(all_predictors()) %>%
-  step_scale(all_predictors()) %>%
-  step_kpca(bio_1_whole_range:bio_19_nrange, threshold = 0.95)
+  step_scale(all_predictors()) 
   
   
 
