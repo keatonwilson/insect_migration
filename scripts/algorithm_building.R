@@ -37,11 +37,12 @@ monarch_real = monarch_real %>%
 #Building the recipe
 monarch_rec = head(monarch_synth) %>%
   recipe(hectares ~ .) %>%
-  step_bagimpute(all_predictors()) %>%
-  step_YeoJohnson(all_predictors()) %>%
+  step_knnimpute(all_predictors()) %>%
+  step_nzv(all_predictors()) %>%
   step_center(all_predictors()) %>%
-  step_scale(all_predictors()) %>%
-  step_nzv(all_predictors())
+  step_scale(all_predictors()) 
+  
+  
 
 #Prepping
 prepped_monarch = prep(monarch_rec, training = monarch_synth, retain = FALSE)
