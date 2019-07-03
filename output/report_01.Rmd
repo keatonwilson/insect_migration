@@ -176,3 +176,10 @@ glimpse(monarch_ml_df)
 ```
 
 So, we've finally got a really big feature set (44 variables!). For information on what each bioclim variable represents, check out [this link](https://www.worldclim.org/bioclim).  
+
+## Preprocessing the data prior to algorithm building  
+We're going to use the `recipes` package to build a pre-processing recipe that we'll then apply to the training (synthetic) and test (real) sets before we start algorithm building. The main preprocessing steps we want to accomplish are:  
+1. k-nn imputation to fill in any missing values  
+2. Center and scale the data  
+3. Remove any variables where there is zero or near-zero variance  
+4. Perform principal component analysis to try and account for some of the covariance in the bioclim variables  
