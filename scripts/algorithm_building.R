@@ -50,6 +50,9 @@ prepped_monarch = prep(monarch_rec, training = monarch_synth, retain = FALSE)
 monarch_train_data = bake(prepped_monarch, new_data = monarch_synth)
 monarch_test_data = bake(prepped_monarch, new_data = monarch_real)
 rm(prepped_monarch)
+write_csv(monarch_train_data, "./data/monarch_train_data.csv")
+write_csv(monarch_test_data, "./data/monarch_test_data.csv")
+
 #Modeling
 #Let's try a simple linear regression first
 train_control = trainControl(method = "repeatedcv", number = 3, repeats = 3)

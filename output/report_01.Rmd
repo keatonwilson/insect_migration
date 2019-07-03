@@ -2,7 +2,9 @@
 title: "Predicting Monarchs in Mexico with Machine Learning Models"
 author: "Keaton Wilson"
 date: "7/2/2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -53,8 +55,9 @@ ggmap(america) +
   geom_point(data = monarch, aes(x = longitude, y = latitude), size = 0.5, alpha = 0.2)
 ```
 
+Ok, these look reasonable. I've taken additional steps not outlined here to do a bit of cleaning on the data before we start building features below. 
  
-```{r, echo = FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results=FALSE}
 #First step is setting up the dataframe that all of this will populate
 #Reading in monarch winter data
 monarch_winter = read_csv("./data/monarch_winter.csv")
@@ -79,8 +82,9 @@ monarch_country_sub = monarch %>%
 ```
 
 ### Feature 1. Date of first sighting
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(lubridate)
+#Building a dataframe of first sightings
 first_us_sighting = monarch_country_sub %>%
   mutate(year = year(date)) %>% 
   filter(country == "USA") %>%
@@ -121,7 +125,7 @@ monarch_ml_df = monarch %>%
 ```
 
 ### Feature 3. Number of sightings during the active season (March-October)  
-Adding a feature that is the number of sightings during the active season divided by/normalied by the total number of sightings for a year.  
+Adding a feature that is the number of sightings during the active season divided by/normalied by the total number of sightings for a year. Also going to leave on the total number of observations by year. 
 
 ```{r}
 monarch_ml_df = monarch %>%
@@ -140,10 +144,10 @@ monarch_ml_df = monarch %>%
   print(n = 50)
 ```
 
-### Feature 4 and 5  
+### Features 4-5. Environmental Variables   
 Adding a bunch of features. The idea here is to generate summaries of bioclim variables (of which there are 19) for two geographic regions. The first is the whole eastern chunk, and the second is the northern range, or the part of range that generates migratory morphs, boundary boxes shown below. 
 
-```{r}
+```{r, echo=FALSE}
 #Cropping - Feature #1 Total Area
 lon_min = -110
 lon_max = -80
@@ -165,7 +169,9 @@ ggmap(america) +
   annotate("text", x = -75, y = 38, label = "Eastern Habitat Boundary Box", size = 2, hjust = 0, color = "red")
 ```
 
-A lot of prism environmental data wrangling here, but the big thing is averaging bioclim cells for each area for each year. 
+A lot of prism environmental data wrangling that I'm not going to show here, but the big thing is averaging bioclim cells for each area for each year. Also, I added the previous year's count (under the assumption that if you know something about last year's numbers, it might be a good predictor for this year's numbers).  
+
+So let's take a look at the final version of the 'real' data. 
 
 ```{r, echo = FALSE, warning = FALSE, message=FALSE}
 monarch_ml_df = read_csv("./data/monarch_data_real.csv")
@@ -175,11 +181,126 @@ monarch_ml_df = read_csv("./data/monarch_data_real.csv")
 glimpse(monarch_ml_df)
 ```
 
-So, we've finally got a really big feature set (44 variables!). For information on what each bioclim variable represents, check out [this link](https://www.worldclim.org/bioclim).  
+So, we've got a really big feature set (43 variables!). For information on what each bioclim variable represents, check out [this link](https://www.worldclim.org/bioclim).  
+
+## Synthetic data generation  
+Here, I use the `synthpop` package to generate 25k observations based on the original data set. `synthpop` uses classification and regression trees (though you can use other predictive algorithms). Below, I'll demonstrate the code, and also look at some comparisons between the real data dn the synthetic data. 
+
+```{r, warning=FALSE, message=FALSE}
+library(synthpop)
+
+#reading in the 'real' data
+monarch_data =read_csv("./data/monarch_data_real.csv")
+
+#Generating a list for all the variables indicating that we want to use density smoothing
+smooth_list = as.list(rep("density", 45))
+names(smooth_list) = names(monarch_data)
+
+#Generating synthetic data
+syn_monarch = synthpop::syn(monarch_data, k = 25000, smoothing = smooth_list)
+
+glimpse(syn_monarch$syn)
+
+#Plotting
+ggplot(data = syn_monarch$syn, aes(x = hectares)) +
+  geom_density(fill = "red", alpha = 0.5) +
+  geom_density(data = monarch_data, aes(x = hectares), fill = "blue", alpha = 0.5) +
+  theme_classic()
+```
+So this is interesting - it looks like the synthetic data generation is matching the original data set very closely but magnifying small-scale structure. In the above graph blue is the original kernel density estimate and red is the synthetic data. Need to look at ways to smooth the curve so it more closely matches the original. Perhaps another algorithm that isn't quite as good at predicition would do the trick.  
+
 
 ## Preprocessing the data prior to algorithm building  
 We're going to use the `recipes` package to build a pre-processing recipe that we'll then apply to the training (synthetic) and test (real) sets before we start algorithm building. The main preprocessing steps we want to accomplish are:  
-1. k-nn imputation to fill in any missing values  
-2. Center and scale the data  
-3. Remove any variables where there is zero or near-zero variance  
-4. Perform principal component analysis to try and account for some of the covariance in the bioclim variables  
+1. **k-nn imputation to fill in any missing values**  
+2. **Center and scale the data**  
+3. **Remove any variables where there is zero or near-zero variance**  
+4. **Also tried some PCA on bioclim variables, but resulted in large drops in predictive power...ended up removing this**  
+
+## Algorithm building  
+
+I built and tuned four algorithms with 5-fold cross validation with 5 repeats:  
+1. **Linear regression**  
+2. **Random Forest**  
+3. **Extreme Gradient Boosting**  
+4. **Ridge and Lasso Regression**  
+
+```{r, echo = FALSE, message=FALSE, warning = FALSE}
+#Reading in saved model objects
+library(caret)
+lm_mod = readRDS("./output/lm_model.rds")
+rf_mod = readRDS("./output/rf_model.rds")
+ridge_lasso_mod = readRDS("./output/ridge_lasso_mod.rds")
+xgboost_mod = readRDS("./output/xgboost_model.rds")
+```
+
+```{r}
+#Let's compare models
+
+#Training data evaluation
+results <- resamples(list(RandomForest=rf_mod, linearreg=lm_mod, xgboost = xgboost_mod, ridge_lass = ridge_lasso_mod))
+
+# summarize the distributions
+summary(results)
+
+# boxplot of results
+bwplot(results, metric="RMSE")
+bwplot(results, metric="MAE")
+
+#Test Data evaluation
+monarch_test_data = read_csv("./data/monarch_test_data.csv")
+#Making predictions
+rf_mod_fit = predict(rf_mod, monarch_test_data)
+xgboost_mod_fit = predict(xgboost_mod, monarch_test_data)
+lm_mod_fit = predict(lm_mod, monarch_test_data)
+ridge_lasso_fit = predict(ridge_lasso_mod, monarch_test_data)
+
+#Post resample on test data
+postResample(pred = rf_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = xgboost_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = lm_mod_fit, obs = monarch_test_data$hectares)
+postResample(pred = ridge_lasso_fit, obs = monarch_test_data$hectares)
+
+```
+
+So, overall these are pretty decent as a first pass. The best model, the extreme gradient boosting model is explaining **over 71%** of the variance in wintering numbers and has a mean absolute errors of about 1.65 hectares.  
+We can also visualize the predictions against the real results for a bit more insight.  
+
+```{r}
+#binding on predicitions
+monarch_test_data$pred = xgboost_mod_fit
+
+ggplot(monarch_test_data, aes(x = hectares, y = pred)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, lty = 2) +
+  theme_classic() +
+  xlab("Actual Hectares") +
+  ylab("Predicted Hectares") +
+  xlim(c(0,25)) +
+  ylim(c(0,15))
+
+```
+
+Overall, this is a pretty good fit - though on average it looks like low values are consistently over predicted and there is one high value that is *WAY* under-predicted. The dashed line above is the 1:1 line - representing perfect prediction.
+
+We can also try and try and glimpse inside the black box by looking at variable importance.
+```{r}
+varImp(xgboost_mod)
+```
+
+This is super interesting. Bioclim 8, 14, 19 are the most importance variables, which are mean temperature of the wettest quarter, precipitation of the driest month and precipitation of the coldest quarter, respectively. Interesting to think about why these might pop out and how they're related to monarch biology.   
+
+Other important factors include total number of observations, and day of first sighting. Number of observations is problematic, because it's not scaled for effort - but may be correlated with a strong downward trend in population numbers (i.e. more recent records always have more total observations because of high effort, but more recent records also have lower numbers because of declines). Need to figure out a good way to control for this in this context.  
+
+## Future Directions  
+
+This is a first pass. I think we can improve the predictive power of the model in a number of ways.  
+
+1. **Larger synthetic data set.** These were built/trained with 25k records - we can definitely increase this. Something like 100k or 500k would be great, but it's going to require substantial computing power on Cyverse.  
+
+2. **Adaptive Tuning.** The `caret` package supports adaptive tuning where once we have a set of model parameters that are producing good results we can narrow the search grid to fine tune these parameters.  
+
+3. **Ensemble models.** I don't show it hear, but the models have fairly low correlations among each other, making them a good fit for ensemble methods. This has worked in a past project I did to increase accuracy.  
+
+4. **Fine tuning the input variables.**. There are probably other variables that we could think of that are important and we might be able to add. Adding more important biological features would probably not be a bad idea.  
+
